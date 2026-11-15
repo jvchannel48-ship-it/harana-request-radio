@@ -86,8 +86,25 @@ export interface SongRequest {
   message?: string
   /** Latest search result note shown to the admin. */
   note?: string
+  /** The song exactly as the listener wrote it, before typo correction. */
+  heard?: string
+  /** How sure the reader was about the corrected title and artist. */
+  confidence?: 'high' | 'medium' | 'low'
+  /** Song found on YouTube that waits for admin confirmation (status 'review'). */
+  candidate?: RequestCandidate
   requestedAt: number
-  status: 'pending' | 'played' | 'skipped'
+  /** 'review' = a likely song was found but the match is not certain; the admin must confirm it. */
+  status: 'pending' | 'review' | 'played' | 'skipped'
+}
+
+export interface RequestCandidate {
+  youtubeId: string
+  title: string
+  url: string
+  channel?: string
+  duration: number
+  /** 0–1 similarity between the request and this result. */
+  score: number
 }
 
 export interface NowResponse {
