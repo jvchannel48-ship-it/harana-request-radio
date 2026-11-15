@@ -14,13 +14,197 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      morefm_listeners: {
+        Row: {
+          last_seen_at: string
+          listener_id: string
+        }
+        Insert: {
+          last_seen_at?: string
+          listener_id: string
+        }
+        Update: {
+          last_seen_at?: string
+          listener_id?: string
+        }
+        Relationships: []
+      }
+      morefm_state: {
+        Row: {
+          storage_key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          storage_key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          storage_key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      requests: {
+        Row: {
+          artist: string | null
+          created_at: string
+          id: string
+          message: string | null
+          name: string
+          note: string | null
+          song_title: string
+          status: string
+        }
+        Insert: {
+          artist?: string | null
+          created_at?: string
+          id?: string
+          message?: string | null
+          name?: string
+          note?: string | null
+          song_title: string
+          status?: string
+        }
+        Update: {
+          artist?: string | null
+          created_at?: string
+          id?: string
+          message?: string | null
+          name?: string
+          note?: string | null
+          song_title?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      songs: {
+        Row: {
+          artist: string
+          category: string
+          created_at: string
+          decade: string | null
+          duration_seconds: number
+          id: string
+          is_active: boolean
+          language: string | null
+          picture: string | null
+          playlist_group: string
+          sort_order: number
+          title: string
+          updated_at: string
+          youtube_id: string
+        }
+        Insert: {
+          artist: string
+          category?: string
+          created_at?: string
+          decade?: string | null
+          duration_seconds: number
+          id?: string
+          is_active?: boolean
+          language?: string | null
+          picture?: string | null
+          playlist_group?: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+          youtube_id: string
+        }
+        Update: {
+          artist?: string
+          category?: string
+          created_at?: string
+          decade?: string | null
+          duration_seconds?: number
+          id?: string
+          is_active?: boolean
+          language?: string | null
+          picture?: string | null
+          playlist_group?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+          youtube_id?: string
+        }
+        Relationships: []
+      }
+      top_played: {
+        Row: {
+          artist: string
+          id: string
+          last_played_at: string
+          play_count: number
+          song_id: string | null
+          title: string
+          updated_at: string
+          youtube_id: string
+        }
+        Insert: {
+          artist: string
+          id?: string
+          last_played_at?: string
+          play_count?: number
+          song_id?: string | null
+          title: string
+          updated_at?: string
+          youtube_id: string
+        }
+        Update: {
+          artist?: string
+          id?: string
+          last_played_at?: string
+          play_count?: number
+          song_id?: string | null
+          title?: string
+          updated_at?: string
+          youtube_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "top_played_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      morefm_acquire_lease: {
+        Args: {
+          _expires_at: number
+          _key: string
+          _now: number
+          _owner: string
+        }
+        Returns: boolean
+      }
+      morefm_listener_count: { Args: never; Returns: number }
+      morefm_register_listener: {
+        Args: { _active: boolean; _id: string; _limit: number }
+        Returns: Json
+      }
+      morefm_release_lease: {
+        Args: { _key: string; _owner: string }
+        Returns: undefined
+      }
+      morefm_renew_lease: {
+        Args: {
+          _expires_at: number
+          _key: string
+          _now: number
+          _owner: string
+        }
+        Returns: boolean
+      }
+      morefm_storage_usage: { Args: never; Returns: Json }
     }
     Enums: {
       [_ in never]: never
