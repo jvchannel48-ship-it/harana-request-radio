@@ -1,4 +1,4 @@
-import { acquireStationLease, addSongRequest, EMPTY_MOR_SYNC_RECORD, getRatings, getSettings, getSongRequests, hasQueuePersistence, MOR_SYNC_PATH, QUEUE_LOCK_PATH, readJson, releaseStationLease, renewStationLease, STATE_PATH, updateSongRequest, writeJson } from './storage'
+import { acquireStationLease, addSongRequest, setSongRequestNote, EMPTY_MOR_SYNC_RECORD, getRatings, getSettings, getSongRequests, hasQueuePersistence, MOR_SYNC_PATH, QUEUE_LOCK_PATH, readJson, releaseStationLease, renewStationLease, STATE_PATH, updateSongRequest, writeJson } from './storage'
 import { getListenerCount } from './listeners'
 import { isChristmasTitle, isNightVolumeWindow, isOffAir, languageForSlot, manilaDateKey, MANILA_OFFSET_MS, manilaTime, nextSignOff, nextSignOn, nextSundayPlaylistBoundary, PROGRAMS, programAt, rotationProgramFor, type Artist, type Program } from './schedule'
 import type { AdminStatus, MorSyncRecord, NowResponse, Track } from './types'
@@ -9,6 +9,7 @@ import { selectSingleBreakAudio } from './break-rotation'
 import { incrementTopPlayed } from './radio-catalog'
 import { getPlaylistTracks, getRjFmPlaylistTracks, RJ_FM_PLAYLIST_URL, searchYouTube, type PlaylistTrackResult, type YouTubeSearchResult } from './youtube-search'
 import christmasCatalog from './christmas-playlist-catalog.json'
+import { readSongRequests, suggestLoveSongs, type LoveSongSuggestion } from './ai-love'
 import { christmasModeForManilaTime, planChristmasTrack } from './seasonal-rotation'
 const API_BASE = 'https://betadash-api-swordslush-production.up.railway.app/mp3juice/api'
 const SONG_REPEAT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
@@ -19,8 +20,10 @@ const QUEUE_LEASE_MS = 100_000
 const SOURCE_REFRESH_WINDOW_MS = 110_000
 const SOURCE_REFRESH_RETRY_MS = 45_000
 const ACTIVE_SOURCE_REFRESH_AFTER_MS = 60_000
-const PRELOAD_QUEUE_WITH_ACTIVE_TRACKS = 30
-const PRELOAD_QUEUE_WITHOUT_ACTIVE_TRACK = 30
+const PRELOAD_QUEUE_WITH_ACTIVE_TRACKS = 10
+const PRELOAD_QUEUE_WITHOUT_ACTIVE_TRACK = 10
+const AUTO_LOVE_BATCH = 12
+const AUTO_LOVE_TRIES_PER_SLOT = 3
 const FILL_BATCH_SIZE = 2
 const RJ_MAKATI_STREAM_URL = '/api/rj-makati-stream'
 const REJECTED_TITLE_RULE = /\b(?:it['’]?s?\s+show\s*time|show\s*time|live\s+concerts?|concerts?\s+live)\b/i
@@ -75,7 +78,7 @@ function monitorStationLease(lease: { pathname: string; owner: string }) {
       console.error('[morefm] queue lease renewal failed', error)
     })
   }, 20_000)
-  timer.unref()
+  ;(timer as unknown as { unref?: () => void }).unref?.()
   return {
     isValid: async () => { await renewal; return valid },
     stop: async () => { clearInterval(timer); await renewal },
@@ -109,9 +112,11 @@ interface StationState {
   lastNewsDate: string
   dailyPlayedDate: string
   dailyPlayedTitles: DailyPlayedTitle[]
+  autoLovePool: LoveSongSuggestion[]
+  autoLoveSongCount: number
 }
 
-const EMPTY_STATE: StationState = { tracks: [], songCount: 0, history: [], christmasRegularTrackCount: 0, christmasSongsRemaining: 0, christmasPlaylistCursor: 0, fillingUntil: 0, lastBreakSongCount: 0, lastNewsDate: '', dailyPlayedDate: '', dailyPlayedTitles: [] }
+const EMPTY_STATE: StationState = { tracks: [], songCount: 0, history: [], christmasRegularTrackCount: 0, christmasSongsRemaining: 0, christmasPlaylistCursor: 0, fillingUntil: 0, lastBreakSongCount: 0, lastNewsDate: '', dailyPlayedDate: '', dailyPlayedTitles: [], autoLovePool: [], autoLoveSongCount: 0 }
 
 interface SearchItem {
   id: string
@@ -220,10 +225,19 @@ export async function queueSongRequest(requestId: string) {
           ...state.tracks.filter((track) => track.kind === 'music' || track.kind === 'mor-sync').map((track) => repeatTitleKey(track.title ?? '', track.artist ?? '')).filter(Boolean),
         ])
       : new Set<string>()
+    if (state.tracks.some((track) => track.requestId === request.id)) return { queued: true, track: { title: request.title, artist: request.artist } }
+    const requestKey = repeatTitleKey(request.title, request.artist)
+    if (blocked.has(requestKey)) {
+      await setSongRequestNote(request.id, 'Already played or queued today; it will not repeat.')
+      return { queued: false, reason: 'This song was already played or is already queued today, so it will not repeat.' }
+    }
     const song = await findMorSong(request.title, request.artist, blocked, false)
-    if (!song) return { queued: false, reason: 'Song not found yet. AutoDJ will keep retrying this request.' }
+    if (!song) {
+      await setSongRequestNote(request.id, `Not found yet (${new Date().toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila' })}). AutoDJ will retry.`)
+      return { queued: false, reason: 'Song not found yet. AutoDJ will keep retrying this request.' }
+    }
     const startAt = nextStart(state, now)
-    state.tracks.push({
+    insertAfterCurrent(state, now, {
       uid: `request-${request.id}-${startAt}`,
       requestId: request.id,
       src: song.src,
@@ -238,20 +252,105 @@ export async function queueSongRequest(requestId: string) {
       kind: 'music',
       title: song.title,
       artist: request.artist,
+      pickedBy: 'request',
     })
-    state.history.push({ id: song.id, key: song.key, artist: request.artist, title: song.title, t: startAt })
+    const inserted = state.tracks.find((track) => track.requestId === request.id)
+    state.history.push({ id: song.id, key: song.key, artist: request.artist, title: song.title, t: inserted?.startAt ?? startAt })
     state.history = state.history.slice(-settings.rotationPoolSize)
     await writeJson(STATE_PATH, state)
+    await setSongRequestNote(request.id, `Queued: ${song.title} — plays ${inserted ? new Date(inserted.startAt).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' }) : 'next'}`)
     return { queued: true, track: { title: song.title, artist: request.artist } }
   } finally {
     await releaseStationLease(lease)
   }
 }
 
-export async function submitSongRequest(title: string, artist: string, name = 'Listener') {
-  const request = await addSongRequest(title, artist, name)
+export async function submitSongRequest(title: string, artist: string, name = 'Listener', message?: string) {
+  const request = await addSongRequest(title, artist, name, message)
   const result = await queueSongRequest(request.id)
   return { accepted: true, request, ...result }
+}
+
+/** Read the title and artist from a free-text message, save each song as a request, and queue it automatically. */
+export async function submitSongMessage(message: string, name = 'Listener') {
+  const { songs, usedAi } = await readSongRequests(message)
+  if (songs.length === 0) {
+    return { accepted: false, songs: [], usedAi, reason: 'Hindi namin mabasa ang title at artist. Isulat po tulad nito: "Ikaw Lamang - Janno Gibbs".' }
+  }
+  const results = []
+  for (const song of songs) {
+    const result = await submitSongRequest(song.title, song.artist, name, message)
+    results.push({ title: song.title, artist: song.artist, queued: Boolean(result.queued), reason: result.reason })
+  }
+  return { accepted: true, usedAi, songs: results, queued: results.some((item) => item.queued) }
+}
+
+/** Put a track right after the song on air (and after earlier requests), shifting the rest of the queue later. */
+function insertAfterCurrent(state: StationState, now: number, track: Track) {
+  let index = state.tracks.findIndex((candidate) => candidate.startAt > now && !candidate.requestId)
+  if (index === -1) {
+    state.tracks.push(track)
+    return
+  }
+  // Keep a jingle/break that is already about to start in front of the request.
+  if (index === 0 && state.tracks.length === 0) index = 0
+  const previous = state.tracks[index - 1]
+  const startAt = previous ? Math.max(now, trackEnd(previous) - previous.fadeOut * 1000) : Math.max(now, state.tracks[index].startAt)
+  state.tracks.splice(index, 0, { ...track, startAt, uid: track.uid.replace(/-\d+$/, `-${startAt}`) })
+  for (let i = index + 1; i < state.tracks.length; i++) {
+    const before = state.tracks[i - 1]
+    const shifted = trackEnd(before) - before.fadeOut * 1000
+    const current = state.tracks[i]
+    if (shifted === current.startAt) continue
+    for (const entry of state.history) if (entry.t === current.startAt) entry.t = shifted
+    current.startAt = shifted
+  }
+}
+
+function autoLoveExcludeList(state: StationState) {
+  const titles = [
+    ...state.dailyPlayedTitles.map((entry) => `${entry.title} - ${entry.artist}`),
+    ...state.history.map((entry) => `${entry.title ?? entry.key} - ${entry.artist}`),
+    ...state.tracks.filter((track) => track.title).map((track) => `${track.title} - ${track.artist ?? ''}`),
+    ...state.autoLovePool.map((entry) => `${entry.title} - ${entry.artist}`),
+  ]
+  return [...new Set(titles)]
+}
+
+/** AutoDJ searches the next classic love song itself and never repeats a title in the no-repeat window. */
+async function findAutoLoveSong(state: StationState, blockedTitleKeys: Set<string>, settings: Awaited<ReturnType<typeof getSettings>>, startAt: number) {
+  const nightMood = manilaTime(startAt).hour >= 22 || manilaTime(startAt).hour < 4
+  state.autoLovePool = state.autoLovePool.filter((entry) => !blockedTitleKeys.has(repeatTitleKey(entry.title, entry.artist)))
+  if (state.autoLovePool.length < AUTO_LOVE_TRIES_PER_SLOT) {
+    try {
+      const suggestions = await suggestLoveSongs({ exclude: autoLoveExcludeList(state), count: AUTO_LOVE_BATCH, tagalogOnly: settings.tagalogOnlyEnabled, nightMood })
+      const known = new Set(state.autoLovePool.map((entry) => repeatTitleKey(entry.title, entry.artist)))
+      for (const suggestion of suggestions) {
+        const key = repeatTitleKey(suggestion.title, suggestion.artist)
+        if (!key || known.has(key) || blockedTitleKeys.has(key) || isChristmasTitle(suggestion.title)) continue
+        known.add(key)
+        state.autoLovePool.push(suggestion)
+      }
+    } catch (error) {
+      console.warn('[morefm] automatic love-song suggestions unavailable', error instanceof Error ? error.message : error)
+    }
+  }
+  for (let attempt = 0; attempt < AUTO_LOVE_TRIES_PER_SLOT && state.autoLovePool.length > 0; attempt++) {
+    // Prefer the language due in the 2 English → 2 Tagalog rotation.
+    const wanted = settings.tagalogOnlyEnabled ? 'Tagalog' : (Math.floor(state.autoLoveSongCount / 2) % 2 === 0 ? 'English' : 'Tagalog')
+    const index = Math.max(0, state.autoLovePool.findIndex((entry) => entry.language === wanted))
+    const [pick] = state.autoLovePool.splice(index, 1)
+    const song = await findMorSong(pick.title, pick.artist, blockedTitleKeys, false)
+    if (song) {
+      state.autoLoveSongCount++
+      return { ...song, title: song.title || pick.title }
+    }
+  }
+  // AI unavailable or nothing matched: search the classic love-song artist pool directly.
+  const program = settings.tagalogOnlyEnabled ? PROGRAMS['sunday-tagalog'] : PROGRAMS['love-mix']
+  const fallback = await findSong(program, state.songCount, state.history, startAt, true, blockedTitleKeys)
+  if (fallback) state.autoLoveSongCount++
+  return fallback
 }
 
 async function findMorFallback(program: Program, songCount: number, history: HistoryEntry[], now: number, shuffleEnabled: boolean, blockedTitleKeys: Set<string>) {
@@ -649,6 +748,7 @@ async function fill(state: StationState, now: number, settings: Awaited<ReturnTy
           kind: 'music',
           title: requestedSong.title,
           artist: pendingRequest.artist,
+          pickedBy: 'request',
         })
         state.history.push({ id: requestedSong.id, key: requestedSong.key, artist: pendingRequest.artist, title: requestedSong.title, t: requestedStart })
         state.history = state.history.slice(-settings.rotationPoolSize)
@@ -728,10 +828,15 @@ async function fill(state: StationState, now: number, settings: Awaited<ReturnTy
     const seasonalPlan = planChristmasTrack(startAt, seasonalState)
     let song: ResolvedSong | null = null
     let isChristmasSong = false
-    if (rotationProgram.id === 'night-love' && state.songCount % 8 === 2) {
+    let pickedBy: Track['pickedBy'] = 'rotation'
+    if (settings.autoLoveSongsEnabled && !seasonalPlan.playChristmas) {
+      song = await findAutoLoveSong(state, blockedTitleKeys, settings, startAt)
+      if (song) pickedBy = 'auto-love'
+    }
+    if (!song && !settings.autoLoveSongsEnabled && rotationProgram.id === 'night-love' && state.songCount % 8 === 2) {
       song = await findMorSong('Dahil Minahal Mo Ako', 'Sarah Geronimo', blockedTitleKeys, true)
     }
-    if (seasonalPlan.playChristmas) {
+    if (!song && seasonalPlan.playChristmas) {
       const christmasSelection = await findChristmasPlaylistSong(state.christmasPlaylistCursor, blockedTitleKeys)
       state.christmasPlaylistCursor = christmasSelection.nextCursor
       song = christmasSelection.song
@@ -799,6 +904,7 @@ async function fill(state: StationState, now: number, settings: Awaited<ReturnTy
       kind: 'music',
       title: song.title,
       artist: song.artist,
+      pickedBy: pickedBy === 'auto-love' ? 'auto-love' : ('sourcePlaylist' in song && song.sourcePlaylist ? 'playlist' : 'rotation'),
     })
     state.history.push({ id: song.id, key: song.key, artist: song.artist, title: song.title, t: songStart })
     if (settings.noRepeatEnabled) blockedTitleKeys.add(repeatTitleKey(song.title, song.artist))
@@ -831,6 +937,8 @@ async function loadState(now: number) {
   state.christmasPlaylistCursor = Number.isFinite(state.christmasPlaylistCursor) ? Math.max(0, Math.floor(state.christmasPlaylistCursor)) : 0
   state.dailyPlayedTitles = Array.isArray(state.dailyPlayedTitles) ? state.dailyPlayedTitles.filter((entry) => Boolean(entry && typeof entry.key === 'string' && typeof entry.title === 'string' && typeof entry.artist === 'string' && typeof entry.playedAt === 'number')) : []
   state.dailyPlayedDate = typeof state.dailyPlayedDate === 'string' ? state.dailyPlayedDate : ''
+  state.autoLovePool = Array.isArray(state.autoLovePool) ? state.autoLovePool.filter((entry) => entry && typeof entry.title === 'string' && typeof entry.artist === 'string').slice(0, 40) : []
+  state.autoLoveSongCount = Number.isFinite(state.autoLoveSongCount) ? state.autoLoveSongCount : 0
   let metadataChanged = false
   for (const track of state.tracks) {
     if (!track.artist) {
@@ -1169,14 +1277,7 @@ export async function getNowPlaying(): Promise<NowResponse> {
     await writeJson(STATE_PATH, state)
   }
 
-  const needsFill = state.tracks.filter((track) => track.startAt > now).length < queueAheadTarget(state, now)
-  if (settings.autoDjEnabled && needsFill) {
-    // Do not hold the live metadata/audio request open while searching. The
-    // station process persists the refill and the next poll picks it up.
-    void fillQueueIfNeeded(settings).catch((error) => {
-      console.error('[morefm] background AutoDJ refill failed', error)
-    })
-  }
+  const needsFill = settings.autoDjEnabled && state.tracks.filter((track) => track.startAt > now).length < queueAheadTarget(state, now)
 
   const responseNow = Date.now()
   if (isOffAir(responseNow, settings.signOffHour, settings.signOnHour) || !settings.broadcastEnabled) {
@@ -1209,7 +1310,23 @@ export async function getNowPlaying(): Promise<NowResponse> {
   }
 
   const tracks = state.tracks.map((track) => track.kind === 'music' || track.kind === 'mor-sync' ? { ...track, src: playableSource(track.src) } : track)
-  return { serverTime: responseNow, offAir: false, boardOperatorEnabled: settings.boardOperatorEnabled, nextOnAir: null, signOffAt: nextSignOff(responseNow, settings.signOffHour), tracks, nightVolumeActive: settings.nightVolumeEnabled && isNightVolumeWindow(responseNow, settings.nightVolumeStartHour, settings.nightVolumeEndHour), audioConfig: audioConfig(settings) }
+  return { serverTime: responseNow, offAir: false, needsFill, boardOperatorEnabled: settings.boardOperatorEnabled, nextOnAir: null, signOffAt: nextSignOff(responseNow, settings.signOffHour), tracks, nightVolumeActive: settings.nightVolumeEnabled && isNightVolumeWindow(responseNow, settings.nightVolumeStartHour, settings.nightVolumeEndHour), audioConfig: audioConfig(settings) }
+}
+
+/** Run one AutoDJ refill (called by the player when the upcoming queue is short). */
+export async function runQueueFill() {
+  const settings = await getSettings()
+  const now = Date.now()
+  if (!settings.broadcastEnabled || isOffAir(now, settings.signOffHour, settings.signOnHour) || rjMakatiRelayActive(now, settings)) return
+  await fillQueueIfNeeded(settings)
+}
+
+/** Retry every pending request that is not yet in the queue (oldest first). */
+export async function retryPendingRequests() {
+  const pending = (await getSongRequests()).filter((request) => request.status === 'pending').sort((a, b) => a.requestedAt - b.requestedAt)
+  const results = []
+  for (const request of pending.slice(0, 5)) results.push({ id: request.id, ...(await queueSongRequest(request.id)) })
+  return results
 }
 
 export async function getAdminStatus(): Promise<AdminStatus> {
@@ -1244,6 +1361,11 @@ export async function getAdminStatus(): Promise<AdminStatus> {
     morSyncStatus,
     morCheckedAt: morRecord.metadata?.checkedAt ?? null,
     dailyPlayedDate: state.dailyPlayedDate,
+    autoLovePoolSize: state.autoLovePool.length,
+    upcoming: state.tracks
+      .filter((track) => trackEnd(track) > now && (track.kind === 'music' || track.kind === 'mor-sync'))
+      .slice(0, 12)
+      .map((track) => ({ uid: track.uid, title: track.title ?? 'Untitled', artist: track.artist ?? '', startAt: track.startAt, active: track.startAt <= now, pickedBy: track.requestId ? 'request' : track.pickedBy ?? 'rotation' })),
     dailyPlayedTitles: state.dailyPlayedTitles.slice().reverse().map((entry) => ({ title: entry.title, artist: entry.artist, playedAt: entry.playedAt })),
     playbackStats: {
       last24Hours: last24Hours.length,
