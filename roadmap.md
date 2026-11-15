@@ -6,3 +6,5 @@
 - [ ] Listener request form: single message box + optional name
 - [ ] Tests for message reading and no-repeat rule
 - [ ] End-to-end check: play, auto search, request
+- [ ] Typo-tolerant request reading (AI) + admin confirmation of unsure matches
+- [ ] Answer Render deploy failure ("Script not found start")
