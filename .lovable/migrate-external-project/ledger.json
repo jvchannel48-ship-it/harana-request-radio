@@ -1,0 +1,17 @@
+{
+  "source": "github:jvchannel48-ship-it/more-fm-automation-system (Next.js 16 on Render)",
+  "capabilities": [
+    {"capability": "code", "source": "Next.js app router pages, components, hooks, lib", "outcome": "port to TanStack Start routes and server routes", "status": "in_progress", "next_action": "copy lib/components and convert API routes"},
+    {"capability": "schema", "source": "morefm_state, morefm_listeners, songs, requests, top_played (Postgres)", "outcome": "migrate to Lovable Cloud", "status": "in_progress", "next_action": "apply migration"},
+    {"capability": "records", "source": "Render/Supabase Postgres + Supabase Storage JSON state", "outcome": "migrate", "status": "pending", "next_action": "ask user for CSV exports of songs/requests/top_played after preview"},
+    {"capability": "auth identities", "source": "single shared admin password cookie (no user accounts)", "outcome": "keep password + signed cookie session", "status": "in_progress", "next_action": "port HMAC cookie auth to Web Crypto"},
+    {"capability": "uploaded file bytes", "source": "Supabase Storage bucket more-fm-media (jingles, commercials, DJ mic)", "outcome": "Lovable Cloud storage bucket", "status": "pending", "next_action": "user re-uploads jingle/commercial files in admin panel"},
+    {"capability": "external providers", "source": "MP3Juice search/download API, youtube-sr, zeno.fm streams/metadata", "outcome": "preserve", "status": "in_progress", "next_action": "verify search + audio proxy from server"},
+    {"capability": "public endpoints", "source": "/api/now, /api/audio, /api/requests, /api/playlist, /api/listeners, /api/rating, /api/top-played, /api/rj-makati-stream", "outcome": "preserve same paths", "status": "in_progress", "next_action": "port"},
+    {"capability": "schedules", "source": "/api/cron/mor-sync minute cron with CRON_SECRET", "outcome": "move to /api/public/cron/mor-sync", "status": "pending", "next_action": "schedule only if user enables RJ FM SONG SYNC"},
+    {"capability": "AI features (new)", "source": "user request", "outcome": "Lovable AI: auto love-song discovery + message song-request reading", "status": "in_progress", "next_action": "implement and test"},
+    {"capability": "secrets", "source": "ADMIN_PASSWORD, ADMIN_SECRET, CRON_SECRET", "outcome": "existing fallback password kept; optional secrets", "status": "pending", "next_action": "offer private ADMIN_PASSWORD"},
+    {"capability": "cutover", "source": "Render deployment", "outcome": "publish on Lovable", "status": "pending", "next_action": "user publishes"},
+    {"capability": "verification", "source": "", "outcome": "build, now-playing, admin flow, request flow", "status": "pending", "next_action": "run checks"}
+  ]
+}
