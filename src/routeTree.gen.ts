@@ -10,33 +10,271 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiListenersRouteImport } from './routes/api/listeners'
+import { Route as ApiNowRouteImport } from './routes/api/now'
+import { Route as ApiPlaylistRouteImport } from './routes/api/playlist'
+import { Route as ApiRatingRouteImport } from './routes/api/rating'
+import { Route as ApiRequestsRouteImport } from './routes/api/requests'
+import { Route as ApiRjMakatiStreamRouteImport } from './routes/api/rj-makati-stream'
+import { Route as ApiTickRouteImport } from './routes/api/tick'
+import { Route as ApiTopPlayedRouteImport } from './routes/api/top-played'
+import { Route as ApiAdminAutoSearchRouteImport } from './routes/api/admin/auto-search'
+import { Route as ApiAdminMediaRouteImport } from './routes/api/admin/media'
+import { Route as ApiAdminPlaylistRouteImport } from './routes/api/admin/playlist'
+import { Route as ApiAdminRequestsRouteImport } from './routes/api/admin/requests'
+import { Route as ApiAdminSessionRouteImport } from './routes/api/admin/session'
+import { Route as ApiAdminSettingsRouteImport } from './routes/api/admin/settings'
+import { Route as ApiAdminUsageRouteImport } from './routes/api/admin/usage'
+import { Route as ApiAudioIndexRouteImport } from './routes/api/audio/index'
+import { Route as ApiAudioSplatRouteImport } from './routes/api/audio/$'
+import { Route as ApiPublicCronMorSyncRouteImport } from './routes/api/public/cron/mor-sync'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiListenersRoute = ApiListenersRouteImport.update({
+  id: '/api/listeners',
+  path: '/api/listeners',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNowRoute = ApiNowRouteImport.update({
+  id: '/api/now',
+  path: '/api/now',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPlaylistRoute = ApiPlaylistRouteImport.update({
+  id: '/api/playlist',
+  path: '/api/playlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRatingRoute = ApiRatingRouteImport.update({
+  id: '/api/rating',
+  path: '/api/rating',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRequestsRoute = ApiRequestsRouteImport.update({
+  id: '/api/requests',
+  path: '/api/requests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRjMakatiStreamRoute = ApiRjMakatiStreamRouteImport.update({
+  id: '/api/rj-makati-stream',
+  path: '/api/rj-makati-stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTickRoute = ApiTickRouteImport.update({
+  id: '/api/tick',
+  path: '/api/tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTopPlayedRoute = ApiTopPlayedRouteImport.update({
+  id: '/api/top-played',
+  path: '/api/top-played',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminAutoSearchRoute = ApiAdminAutoSearchRouteImport.update({
+  id: '/api/admin/auto-search',
+  path: '/api/admin/auto-search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminMediaRoute = ApiAdminMediaRouteImport.update({
+  id: '/api/admin/media',
+  path: '/api/admin/media',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminPlaylistRoute = ApiAdminPlaylistRouteImport.update({
+  id: '/api/admin/playlist',
+  path: '/api/admin/playlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminRequestsRoute = ApiAdminRequestsRouteImport.update({
+  id: '/api/admin/requests',
+  path: '/api/admin/requests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminSessionRoute = ApiAdminSessionRouteImport.update({
+  id: '/api/admin/session',
+  path: '/api/admin/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminSettingsRoute = ApiAdminSettingsRouteImport.update({
+  id: '/api/admin/settings',
+  path: '/api/admin/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminUsageRoute = ApiAdminUsageRouteImport.update({
+  id: '/api/admin/usage',
+  path: '/api/admin/usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAudioIndexRoute = ApiAudioIndexRouteImport.update({
+  id: '/api/audio/',
+  path: '/api/audio/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAudioSplatRoute = ApiAudioSplatRouteImport.update({
+  id: '/api/audio/$',
+  path: '/api/audio/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicCronMorSyncRoute = ApiPublicCronMorSyncRouteImport.update({
+  id: '/api/public/cron/mor-sync',
+  path: '/api/public/cron/mor-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/listeners': typeof ApiListenersRoute
+  '/api/now': typeof ApiNowRoute
+  '/api/playlist': typeof ApiPlaylistRoute
+  '/api/rating': typeof ApiRatingRoute
+  '/api/requests': typeof ApiRequestsRoute
+  '/api/rj-makati-stream': typeof ApiRjMakatiStreamRoute
+  '/api/tick': typeof ApiTickRoute
+  '/api/top-played': typeof ApiTopPlayedRoute
+  '/api/admin/auto-search': typeof ApiAdminAutoSearchRoute
+  '/api/admin/media': typeof ApiAdminMediaRoute
+  '/api/admin/playlist': typeof ApiAdminPlaylistRoute
+  '/api/admin/requests': typeof ApiAdminRequestsRoute
+  '/api/admin/session': typeof ApiAdminSessionRoute
+  '/api/admin/settings': typeof ApiAdminSettingsRoute
+  '/api/admin/usage': typeof ApiAdminUsageRoute
+  '/api/audio/$': typeof ApiAudioSplatRoute
+  '/api/audio/': typeof ApiAudioIndexRoute
+  '/api/public/cron/mor-sync': typeof ApiPublicCronMorSyncRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/listeners': typeof ApiListenersRoute
+  '/api/now': typeof ApiNowRoute
+  '/api/playlist': typeof ApiPlaylistRoute
+  '/api/rating': typeof ApiRatingRoute
+  '/api/requests': typeof ApiRequestsRoute
+  '/api/rj-makati-stream': typeof ApiRjMakatiStreamRoute
+  '/api/tick': typeof ApiTickRoute
+  '/api/top-played': typeof ApiTopPlayedRoute
+  '/api/admin/auto-search': typeof ApiAdminAutoSearchRoute
+  '/api/admin/media': typeof ApiAdminMediaRoute
+  '/api/admin/playlist': typeof ApiAdminPlaylistRoute
+  '/api/admin/requests': typeof ApiAdminRequestsRoute
+  '/api/admin/session': typeof ApiAdminSessionRoute
+  '/api/admin/settings': typeof ApiAdminSettingsRoute
+  '/api/admin/usage': typeof ApiAdminUsageRoute
+  '/api/audio/$': typeof ApiAudioSplatRoute
+  '/api/audio': typeof ApiAudioIndexRoute
+  '/api/public/cron/mor-sync': typeof ApiPublicCronMorSyncRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/listeners': typeof ApiListenersRoute
+  '/api/now': typeof ApiNowRoute
+  '/api/playlist': typeof ApiPlaylistRoute
+  '/api/rating': typeof ApiRatingRoute
+  '/api/requests': typeof ApiRequestsRoute
+  '/api/rj-makati-stream': typeof ApiRjMakatiStreamRoute
+  '/api/tick': typeof ApiTickRoute
+  '/api/top-played': typeof ApiTopPlayedRoute
+  '/api/admin/auto-search': typeof ApiAdminAutoSearchRoute
+  '/api/admin/media': typeof ApiAdminMediaRoute
+  '/api/admin/playlist': typeof ApiAdminPlaylistRoute
+  '/api/admin/requests': typeof ApiAdminRequestsRoute
+  '/api/admin/session': typeof ApiAdminSessionRoute
+  '/api/admin/settings': typeof ApiAdminSettingsRoute
+  '/api/admin/usage': typeof ApiAdminUsageRoute
+  '/api/audio/$': typeof ApiAudioSplatRoute
+  '/api/audio/': typeof ApiAudioIndexRoute
+  '/api/public/cron/mor-sync': typeof ApiPublicCronMorSyncRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/api/listeners'
+    | '/api/now'
+    | '/api/playlist'
+    | '/api/rating'
+    | '/api/requests'
+    | '/api/rj-makati-stream'
+    | '/api/tick'
+    | '/api/top-played'
+    | '/api/admin/auto-search'
+    | '/api/admin/media'
+    | '/api/admin/playlist'
+    | '/api/admin/requests'
+    | '/api/admin/session'
+    | '/api/admin/settings'
+    | '/api/admin/usage'
+    | '/api/audio/$'
+    | '/api/audio/'
+    | '/api/public/cron/mor-sync'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/api/listeners'
+    | '/api/now'
+    | '/api/playlist'
+    | '/api/rating'
+    | '/api/requests'
+    | '/api/rj-makati-stream'
+    | '/api/tick'
+    | '/api/top-played'
+    | '/api/admin/auto-search'
+    | '/api/admin/media'
+    | '/api/admin/playlist'
+    | '/api/admin/requests'
+    | '/api/admin/session'
+    | '/api/admin/settings'
+    | '/api/admin/usage'
+    | '/api/audio/$'
+    | '/api/audio'
+    | '/api/public/cron/mor-sync'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/listeners'
+    | '/api/now'
+    | '/api/playlist'
+    | '/api/rating'
+    | '/api/requests'
+    | '/api/rj-makati-stream'
+    | '/api/tick'
+    | '/api/top-played'
+    | '/api/admin/auto-search'
+    | '/api/admin/media'
+    | '/api/admin/playlist'
+    | '/api/admin/requests'
+    | '/api/admin/session'
+    | '/api/admin/settings'
+    | '/api/admin/usage'
+    | '/api/audio/$'
+    | '/api/audio/'
+    | '/api/public/cron/mor-sync'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiListenersRoute: typeof ApiListenersRoute
+  ApiNowRoute: typeof ApiNowRoute
+  ApiPlaylistRoute: typeof ApiPlaylistRoute
+  ApiRatingRoute: typeof ApiRatingRoute
+  ApiRequestsRoute: typeof ApiRequestsRoute
+  ApiRjMakatiStreamRoute: typeof ApiRjMakatiStreamRoute
+  ApiTickRoute: typeof ApiTickRoute
+  ApiTopPlayedRoute: typeof ApiTopPlayedRoute
+  ApiAdminAutoSearchRoute: typeof ApiAdminAutoSearchRoute
+  ApiAdminMediaRoute: typeof ApiAdminMediaRoute
+  ApiAdminPlaylistRoute: typeof ApiAdminPlaylistRoute
+  ApiAdminRequestsRoute: typeof ApiAdminRequestsRoute
+  ApiAdminSessionRoute: typeof ApiAdminSessionRoute
+  ApiAdminSettingsRoute: typeof ApiAdminSettingsRoute
+  ApiAdminUsageRoute: typeof ApiAdminUsageRoute
+  ApiAudioSplatRoute: typeof ApiAudioSplatRoute
+  ApiAudioIndexRoute: typeof ApiAudioIndexRoute
+  ApiPublicCronMorSyncRoute: typeof ApiPublicCronMorSyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +286,155 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/listeners': {
+      id: '/api/listeners'
+      path: '/api/listeners'
+      fullPath: '/api/listeners'
+      preLoaderRoute: typeof ApiListenersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/now': {
+      id: '/api/now'
+      path: '/api/now'
+      fullPath: '/api/now'
+      preLoaderRoute: typeof ApiNowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/playlist': {
+      id: '/api/playlist'
+      path: '/api/playlist'
+      fullPath: '/api/playlist'
+      preLoaderRoute: typeof ApiPlaylistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rating': {
+      id: '/api/rating'
+      path: '/api/rating'
+      fullPath: '/api/rating'
+      preLoaderRoute: typeof ApiRatingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/requests': {
+      id: '/api/requests'
+      path: '/api/requests'
+      fullPath: '/api/requests'
+      preLoaderRoute: typeof ApiRequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rj-makati-stream': {
+      id: '/api/rj-makati-stream'
+      path: '/api/rj-makati-stream'
+      fullPath: '/api/rj-makati-stream'
+      preLoaderRoute: typeof ApiRjMakatiStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tick': {
+      id: '/api/tick'
+      path: '/api/tick'
+      fullPath: '/api/tick'
+      preLoaderRoute: typeof ApiTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/top-played': {
+      id: '/api/top-played'
+      path: '/api/top-played'
+      fullPath: '/api/top-played'
+      preLoaderRoute: typeof ApiTopPlayedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/auto-search': {
+      id: '/api/admin/auto-search'
+      path: '/api/admin/auto-search'
+      fullPath: '/api/admin/auto-search'
+      preLoaderRoute: typeof ApiAdminAutoSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/media': {
+      id: '/api/admin/media'
+      path: '/api/admin/media'
+      fullPath: '/api/admin/media'
+      preLoaderRoute: typeof ApiAdminMediaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/playlist': {
+      id: '/api/admin/playlist'
+      path: '/api/admin/playlist'
+      fullPath: '/api/admin/playlist'
+      preLoaderRoute: typeof ApiAdminPlaylistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/requests': {
+      id: '/api/admin/requests'
+      path: '/api/admin/requests'
+      fullPath: '/api/admin/requests'
+      preLoaderRoute: typeof ApiAdminRequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/session': {
+      id: '/api/admin/session'
+      path: '/api/admin/session'
+      fullPath: '/api/admin/session'
+      preLoaderRoute: typeof ApiAdminSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/settings': {
+      id: '/api/admin/settings'
+      path: '/api/admin/settings'
+      fullPath: '/api/admin/settings'
+      preLoaderRoute: typeof ApiAdminSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/usage': {
+      id: '/api/admin/usage'
+      path: '/api/admin/usage'
+      fullPath: '/api/admin/usage'
+      preLoaderRoute: typeof ApiAdminUsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/audio/': {
+      id: '/api/audio/'
+      path: '/api/audio'
+      fullPath: '/api/audio/'
+      preLoaderRoute: typeof ApiAudioIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/audio/$': {
+      id: '/api/audio/$'
+      path: '/api/audio/$'
+      fullPath: '/api/audio/$'
+      preLoaderRoute: typeof ApiAudioSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/mor-sync': {
+      id: '/api/public/cron/mor-sync'
+      path: '/api/public/cron/mor-sync'
+      fullPath: '/api/public/cron/mor-sync'
+      preLoaderRoute: typeof ApiPublicCronMorSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiListenersRoute: ApiListenersRoute,
+  ApiNowRoute: ApiNowRoute,
+  ApiPlaylistRoute: ApiPlaylistRoute,
+  ApiRatingRoute: ApiRatingRoute,
+  ApiRequestsRoute: ApiRequestsRoute,
+  ApiRjMakatiStreamRoute: ApiRjMakatiStreamRoute,
+  ApiTickRoute: ApiTickRoute,
+  ApiTopPlayedRoute: ApiTopPlayedRoute,
+  ApiAdminAutoSearchRoute: ApiAdminAutoSearchRoute,
+  ApiAdminMediaRoute: ApiAdminMediaRoute,
+  ApiAdminPlaylistRoute: ApiAdminPlaylistRoute,
+  ApiAdminRequestsRoute: ApiAdminRequestsRoute,
+  ApiAdminSessionRoute: ApiAdminSessionRoute,
+  ApiAdminSettingsRoute: ApiAdminSettingsRoute,
+  ApiAdminUsageRoute: ApiAdminUsageRoute,
+  ApiAudioSplatRoute: ApiAudioSplatRoute,
+  ApiAudioIndexRoute: ApiAudioIndexRoute,
+  ApiPublicCronMorSyncRoute: ApiPublicCronMorSyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
