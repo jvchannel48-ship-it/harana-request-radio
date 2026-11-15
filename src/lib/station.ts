@@ -62,6 +62,8 @@ const EMERGENCY_OPM_ROTATION = [
 ] as const
 // Coalesce simultaneous listener polls that land in the same server runtime.
 let activeQueueFill: Promise<void> | null = null
+// Unmatched requests are retried at most every few minutes so they never stall the rotation.
+const requestRetryAt = new Map<string, number>()
 
 function playableSource(url: string) {
   return url.startsWith('/api/audio?') ? url : `/api/audio?url=${encodeURIComponent(url)}`
@@ -228,7 +230,8 @@ export async function queueSongRequest(requestId: string) {
     if (state.tracks.some((track) => track.requestId === request.id)) return { queued: true, track: { title: request.title, artist: request.artist } }
     const requestKey = repeatTitleKey(request.title, request.artist)
     if (blocked.has(requestKey)) {
-      await setSongRequestNote(request.id, 'Already played or queued today; it will not repeat.')
+      await updateSongRequest(request.id, 'skipped')
+      await setSongRequestNote(request.id, 'Already played or queued today; skipped so it will not repeat.')
       return { queued: false, reason: 'This song was already played or is already queued today, so it will not repeat.' }
     }
     const song = await findMorSong(request.title, request.artist, blocked, false)
@@ -292,8 +295,6 @@ function insertAfterCurrent(state: StationState, now: number, track: Track) {
     state.tracks.push(track)
     return
   }
-  // Keep a jingle/break that is already about to start in front of the request.
-  if (index === 0 && state.tracks.length === 0) index = 0
   const previous = state.tracks[index - 1]
   const startAt = previous ? Math.max(now, trackEnd(previous) - previous.fadeOut * 1000) : Math.max(now, state.tracks[index].startAt)
   state.tracks.splice(index, 0, { ...track, startAt, uid: track.uid.replace(/-\d+$/, `-${startAt}`) })
@@ -728,11 +729,15 @@ async function fill(state: StationState, now: number, settings: Awaited<ReturnTy
       christmasTracksRemaining: state.christmasSongsRemaining,
     })
     const pendingRequest = !nextSlotSeasonalPlan.playChristmas && hasQueuePersistence
-      ? (await getSongRequests()).find((request) => request.status === 'pending' && !state.tracks.some((track) => track.requestId === request.id))
+      ? (await getSongRequests())
+        .filter((request) => request.status === 'pending' && !state.tracks.some((track) => track.requestId === request.id) && (requestRetryAt.get(request.id) ?? 0) <= Date.now())
+        .sort((a, b) => a.requestedAt - b.requestedAt)[0]
       : undefined
     if (pendingRequest) {
       const requestedSong = await findMorSong(pendingRequest.title, pendingRequest.artist, blockedTitleKeys, false)
+      if (!requestedSong) requestRetryAt.set(pendingRequest.id, Date.now() + 5 * 60_000)
       if (requestedSong) {
+        void setSongRequestNote(pendingRequest.id, `Queued: ${requestedSong.title}`)
         const requestedStart = nextStart(state, now)
         state.tracks.push({
           uid: `request-${pendingRequest.id}-${requestedStart}`,
