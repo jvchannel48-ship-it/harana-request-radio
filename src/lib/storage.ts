@@ -129,7 +129,8 @@ export const DEFAULT_SETTINGS: StationSettings = {
   goodVibesEnabled: false,
   rotationPoolSize: 100,
   listenerLimit: 2,
-  tagalogOnlyEnabled: true,
+  tagalogOnlyEnabled: false,
+  autoLoveSongsEnabled: true,
   transmitterWatts: 100000,
   signOffHour: 1,
   signOnHour: 4,
@@ -174,7 +175,7 @@ export async function getSettings(): Promise<StationSettings> {
     const migrated = {
       ...saved,
       ...(needsTagalogMigration ? {
-        tagalogOnlyEnabled: typeof saved.tagalogOnlyEnabled === 'boolean' ? saved.tagalogOnlyEnabled : true,
+        tagalogOnlyEnabled: typeof saved.tagalogOnlyEnabled === 'boolean' ? saved.tagalogOnlyEnabled : false,
         noRepeatEnabled: typeof saved.noRepeatEnabled === 'boolean' ? saved.noRepeatEnabled : true,
         shuffleEnabled: false,
       } : {}),
@@ -216,7 +217,8 @@ export async function getSettings(): Promise<StationSettings> {
     goodVibesEnabled: typeof saved.goodVibesEnabled === 'boolean' ? saved.goodVibesEnabled : false,
     rotationPoolSize: typeof saved.rotationPoolSize === 'number' ? Math.max(50, Math.min(300, Math.round(saved.rotationPoolSize))) : 100,
     listenerLimit: typeof saved.listenerLimit === 'number' ? Math.max(0, Math.min(1000, Math.round(saved.listenerLimit))) : DEFAULT_SETTINGS.listenerLimit,
-    tagalogOnlyEnabled: typeof saved.tagalogOnlyEnabled === 'boolean' ? saved.tagalogOnlyEnabled : true,
+    tagalogOnlyEnabled: typeof saved.tagalogOnlyEnabled === 'boolean' ? saved.tagalogOnlyEnabled : false,
+    autoLoveSongsEnabled: typeof saved.autoLoveSongsEnabled === 'boolean' ? saved.autoLoveSongsEnabled : true,
     transmitterWatts: [0, 5000, 20000, 100000].includes(saved.transmitterWatts as number) ? saved.transmitterWatts as StationSettings['transmitterWatts'] : 100000,
     signOffHour: typeof saved.signOffHour === 'number' && saved.signOffHour >= 0 && saved.signOffHour <= 23 ? Math.round(saved.signOffHour) : DEFAULT_SETTINGS.signOffHour,
     signOnHour: typeof saved.signOnHour === 'number' && saved.signOnHour >= 0 && saved.signOnHour <= 23 ? Math.round(saved.signOnHour) : DEFAULT_SETTINGS.signOnHour,

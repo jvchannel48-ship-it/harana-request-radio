@@ -19,6 +19,8 @@ export interface Track {
   artist?: string
   morKey?: string
   morExactMatch?: boolean
+  /** How AutoDJ picked this track. */
+  pickedBy?: 'request' | 'auto-love' | 'playlist' | 'rotation'
 }
 
 export interface AudioAsset {
@@ -43,6 +45,8 @@ export interface StationSettings {
   rotationPoolSize: number
   listenerLimit: number
   tagalogOnlyEnabled: boolean
+  /** AutoDJ finds the next songs itself: classic 60s–2000s Tagalog and English love songs, never repeating. */
+  autoLoveSongsEnabled: boolean
   transmitterWatts: TransmitterWatts
   signOffHour: number
   signOnHour: number
@@ -78,6 +82,10 @@ export interface SongRequest {
   title: string
   artist: string
   name?: string
+  /** Original listener message the title and artist were read from. */
+  message?: string
+  /** Latest search result note shown to the admin. */
+  note?: string
   requestedAt: number
   status: 'pending' | 'played' | 'skipped'
 }
@@ -90,6 +98,8 @@ export interface NowResponse {
   signOffAt: number | null
   tracks: Track[]
   nightVolumeActive: boolean
+  /** True when the upcoming queue is short; the player then asks the server to find more songs. */
+  needsFill?: boolean
   audioConfig: Pick<StationSettings, 'masterVolume' | 'nightVolumePercent' | 'bassGainDb' | 'crossfaderEnabled' | 'crossfaderCurve' | 'crossfadeSeconds' | 'replayGainEnabled' | 'replayGainTargetLufs'>
 }
 
@@ -146,4 +156,6 @@ export interface AdminStatus extends StationSettings {
   morCheckedAt: number | null
   dailyPlayedTitles: Array<{ title: string; artist: string; playedAt: number }>
   dailyPlayedDate: string
+  upcoming: Array<{ uid: string; title: string; artist: string; startAt: number; active: boolean; pickedBy: string }>
+  autoLovePoolSize: number
 }
