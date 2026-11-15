@@ -1,4 +1,4 @@
-import { ensureDatabaseTables, getPostgresPool, readJson, writeJson } from './storage'
+import { supabaseAdmin } from '@/integrations/supabase/client.server'
 
 export type RadioCatalogSong = {
   title: string
@@ -13,44 +13,26 @@ export type RadioCatalogSong = {
   sort_order: number
 }
 
+const COLUMNS = 'title, artist, youtube_id, category, language, decade, picture, duration_seconds, playlist_group, sort_order'
 let catalogCache: { rows: RadioCatalogSong[] | null; expiresAt: number } | null = null
-let catalogLoad: Promise<RadioCatalogSong[] | null> | null = null
 let lastCatalogWarningAt = 0
-const CATALOG_PATH = 'station/radio-catalog.json'
 
 export async function getRadioCatalogSongs(): Promise<RadioCatalogSong[] | null> {
-  const pool = getPostgresPool()
   if (catalogCache && catalogCache.expiresAt > Date.now()) return catalogCache.rows
-  if (catalogLoad) return catalogLoad
-  catalogLoad = (async () => {
-    try {
-      if (!pool) {
-        const rows = await readJson<RadioCatalogSong[]>(CATALOG_PATH, [])
-        catalogCache = { rows, expiresAt: Date.now() + 10_000 }
-        return rows
-      }
-      await ensureDatabaseTables()
-      const result = await pool.query<RadioCatalogSong>(`
-        SELECT title, artist, youtube_id, category, language, decade, picture,
-               duration_seconds, playlist_group, sort_order
-        FROM public.songs
-        WHERE is_active = true
-        ORDER BY CASE playlist_group WHEN 'RJ TOP SONGS' THEN 0 ELSE 1 END, sort_order, created_at, youtube_id
-      `)
-      catalogCache = { rows: result.rows, expiresAt: Date.now() + 60_000 }
-      return result.rows
-    } catch (error) {
-      if (Date.now() - lastCatalogWarningAt > 60_000) {
-        lastCatalogWarningAt = Date.now()
-        console.warn('[morefm] Supabase song catalog unavailable; using bundled playlists', error)
-      }
-      catalogCache = { rows: null, expiresAt: Date.now() + 15_000 }
-      return null
-    } finally {
-      catalogLoad = null
+  const { data, error } = await supabaseAdmin.from('songs').select(COLUMNS).eq('is_active', true)
+    .order('playlist_group', { ascending: false }).order('sort_order').order('created_at').limit(1000)
+  if (error) {
+    if (Date.now() - lastCatalogWarningAt > 60_000) {
+      lastCatalogWarningAt = Date.now()
+      console.warn('[morefm] song catalog unavailable; using bundled playlists', error.message)
     }
-  })()
-  return catalogLoad
+    catalogCache = { rows: null, expiresAt: Date.now() + 15_000 }
+    return null
+  }
+  const rows = (data ?? []) as RadioCatalogSong[]
+  // 'RJ TOP SONGS' sorts before 'RJ PLAYED' when ordered descending.
+  catalogCache = { rows, expiresAt: Date.now() + 60_000 }
+  return rows
 }
 
 export async function upsertRadioCatalogSong(input: {
@@ -62,100 +44,58 @@ export async function upsertRadioCatalogSong(input: {
   category?: string
   picture?: string | null
 }) {
-  const pool = getPostgresPool()
-  if (!pool) {
-    const current = await readJson<RadioCatalogSong[]>(CATALOG_PATH, [])
-    const existing = current.find((song) => song.youtube_id === input.youtubeId)
-    const nextSong: RadioCatalogSong = {
-      title: input.title.slice(0, 200),
-      artist: input.artist.slice(0, 120),
-      youtube_id: input.youtubeId,
-      category: input.category ?? 'english',
-      language: null,
-      decade: null,
-      picture: input.picture ?? null,
-      duration_seconds: Math.max(60, Math.min(540, Math.round(input.durationSeconds))),
-      playlist_group: input.playlistGroup,
-      sort_order: existing?.sort_order ?? current.filter((song) => song.playlist_group === input.playlistGroup).reduce((max, song) => Math.max(max, song.sort_order), -1) + 1,
-    }
-    await writeJson(CATALOG_PATH, [...current.filter((song) => song.youtube_id !== input.youtubeId), nextSong])
-    catalogCache = null
-    return nextSong
-  }
-  await ensureDatabaseTables()
-  const durationSeconds = Math.max(60, Math.min(540, Math.round(input.durationSeconds)))
-  const result = await pool.query<RadioCatalogSong>(`
-    INSERT INTO public.songs (title, artist, youtube_id, category, language, decade, picture, duration_seconds, playlist_group, sort_order, is_active)
-    VALUES ($1, $2, $3, $4, NULL, NULL, $5, $6, $7, COALESCE((SELECT max(sort_order) + 1 FROM public.songs WHERE playlist_group = $7), 0), true)
-    ON CONFLICT (youtube_id) DO UPDATE SET
-      title = EXCLUDED.title,
-      artist = EXCLUDED.artist,
-      picture = EXCLUDED.picture,
-      duration_seconds = EXCLUDED.duration_seconds,
-      playlist_group = EXCLUDED.playlist_group,
-      is_active = true
-    RETURNING title, artist, youtube_id, category, language, decade, picture, duration_seconds, playlist_group, sort_order
-  `, [input.title.slice(0, 200), input.artist.slice(0, 120), input.youtubeId, input.category ?? 'english', input.picture ?? null, durationSeconds, input.playlistGroup])
+  const { data: last } = await supabaseAdmin.from('songs').select('sort_order').eq('playlist_group', input.playlistGroup)
+    .order('sort_order', { ascending: false }).limit(1).maybeSingle()
+  const { data: existing } = await supabaseAdmin.from('songs').select('sort_order').eq('youtube_id', input.youtubeId).maybeSingle()
+  const { data, error } = await supabaseAdmin.from('songs').upsert({
+    title: input.title.slice(0, 200),
+    artist: input.artist.slice(0, 120),
+    youtube_id: input.youtubeId,
+    category: input.category ?? 'english',
+    picture: input.picture ?? null,
+    duration_seconds: Math.max(60, Math.min(540, Math.round(input.durationSeconds))),
+    playlist_group: input.playlistGroup,
+    sort_order: existing?.sort_order ?? (last ? last.sort_order + 1 : 0),
+    is_active: true,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'youtube_id' }).select(COLUMNS).single()
+  if (error) throw new Error(`Could not save the song: ${error.message}`)
   catalogCache = null
-  return result.rows[0]
+  return data as RadioCatalogSong
 }
 
 export async function deactivateRadioCatalogSong(youtubeId: string) {
-  const pool = getPostgresPool()
-  if (!pool) {
-    const current = await readJson<RadioCatalogSong[]>(CATALOG_PATH, [])
-    const next = current.filter((song) => song.youtube_id !== youtubeId)
-    if (next.length === current.length) return false
-    await writeJson(CATALOG_PATH, next)
-    catalogCache = null
-    return true
-  }
-  await ensureDatabaseTables()
-  const result = await pool.query<{ youtube_id: string }>(
-    'UPDATE public.songs SET is_active = false, updated_at = now() WHERE youtube_id = $1 RETURNING youtube_id',
-    [youtubeId],
-  )
+  const { data, error } = await supabaseAdmin.from('songs').update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq('youtube_id', youtubeId).select('youtube_id')
+  if (error) throw new Error(`Could not remove the song: ${error.message}`)
   catalogCache = null
-  return Boolean(result.rowCount)
+  return (data ?? []).length > 0
 }
 
 export async function incrementTopPlayed(input: { youtubeId?: string; title: string; artist: string }) {
   const youtubeId = input.youtubeId?.trim()
-  const pool = getPostgresPool()
-  if (!pool || !youtubeId || !/^[\w-]{6,32}$/.test(youtubeId)) return
+  if (!youtubeId || !/^[\w-]{6,32}$/.test(youtubeId)) return
   try {
-    await ensureDatabaseTables()
-    await pool.query(`
-      INSERT INTO public.top_played (song_id, youtube_id, title, artist, play_count, last_played_at, updated_at)
-      VALUES ((SELECT id FROM public.songs WHERE youtube_id = $1), $1, $2, $3, 1, now(), now())
-      ON CONFLICT (youtube_id) DO UPDATE SET
-        song_id = COALESCE(EXCLUDED.song_id, public.top_played.song_id),
-        title = EXCLUDED.title,
-        artist = EXCLUDED.artist,
-        play_count = public.top_played.play_count + 1,
-        last_played_at = now(),
-        updated_at = now()
-    `, [youtubeId, input.title.slice(0, 200), input.artist.slice(0, 120)])
+    const { data: current } = await supabaseAdmin.from('top_played').select('play_count').eq('youtube_id', youtubeId).maybeSingle()
+    const { data: song } = await supabaseAdmin.from('songs').select('id').eq('youtube_id', youtubeId).maybeSingle()
+    await supabaseAdmin.from('top_played').upsert({
+      youtube_id: youtubeId,
+      song_id: song?.id ?? null,
+      title: input.title.slice(0, 200),
+      artist: input.artist.slice(0, 120),
+      play_count: Number(current?.play_count ?? 0) + 1,
+      last_played_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'youtube_id' })
   } catch (error) {
-    console.warn('[morefm] could not update Supabase top-played count', error)
+    console.warn('[morefm] could not update top-played count', error)
   }
 }
 
 export async function getTopPlayed(limit = 20) {
-  const pool = getPostgresPool()
-  if (!pool) return []
-  try {
-    await ensureDatabaseTables()
-    const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)))
-    const result = await pool.query(`
-      SELECT youtube_id, title, artist, play_count, last_played_at
-      FROM public.top_played
-      ORDER BY play_count DESC, last_played_at DESC
-      LIMIT $1
-    `, [safeLimit])
-    return result.rows
-  } catch (error) {
-    console.warn('[morefm] could not load Supabase top-played list', error)
-    return []
-  }
+  const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)))
+  const { data, error } = await supabaseAdmin.from('top_played').select('youtube_id, title, artist, play_count, last_played_at')
+    .order('play_count', { ascending: false }).order('last_played_at', { ascending: false }).limit(safeLimit)
+  if (error) return []
+  return data ?? []
 }
