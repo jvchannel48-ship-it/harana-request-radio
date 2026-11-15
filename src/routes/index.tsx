@@ -1,23 +1,60 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { FeedbackForm } from "@/components/station/feedback-form";
+import { AdminMenu } from "@/components/station/admin-menu";
+import { PlaylistMenu } from "@/components/station/playlist-menu";
+import { RadioPlayer } from "@/components/station/radio-player";
+import { ThemeToggle } from "@/components/theme-toggle";
 
-// The home route ships no og:image, so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "RJ FM — Old Love Songs Radio" },
+      {
+        name: "description",
+        content: "RJ FM radio: classic Tagalog and English love songs from the 60s to 2000s, with song requests.",
+      },
+      { property: "og:title", content: "RJ FM — Old Love Songs Radio" },
+      {
+        property: "og:description",
+        content: "Classic Tagalog and English love songs from the 60s to 2000s, with song requests.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: Home,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+function Home() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
+    <div className="studio-shell relative flex min-h-dvh flex-col overflow-hidden">
+      <div
+        className="pointer-events-none absolute left-1/2 top-1/3 -z-10 size-[36rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-3xl"
+        aria-hidden="true"
       />
+      <header className="glass-surface mx-auto mt-3 flex w-[calc(100%-1rem)] max-w-3xl flex-wrap items-center justify-between gap-2 rounded-2xl px-2.5 py-2.5 sm:mt-5 sm:flex-nowrap sm:gap-3 sm:px-4 sm:py-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <div className="size-12 shrink-0 overflow-hidden rounded-full border border-primary/60 bg-card p-1 shadow-lg shadow-primary/10 sm:size-20">
+            <img src="/rj-fm-logo.jpg" alt="RJ FM station logo" className="size-full rounded-full object-cover" />
+          </div>
+          <span className="font-mono text-xs font-bold tracking-widest sm:text-sm">
+            RJ <span className="text-primary">FM</span>
+          </span>
+        </div>
+        <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
+          <PlaylistMenu />
+          <FeedbackForm />
+          <AdminMenu />
+          <ThemeToggle />
+        </div>
+      </header>
+
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center px-4 py-8">
+        <h1 className="sr-only">RJ FM radio</h1>
+        <RadioPlayer />
+      </main>
+
+      <div className="h-8" aria-hidden="true" />
     </div>
   );
 }
