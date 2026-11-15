@@ -50,7 +50,10 @@ export type Database = {
       requests: {
         Row: {
           artist: string | null
+          candidate: Json | null
+          confidence: string | null
           created_at: string
+          heard: string | null
           id: string
           message: string | null
           name: string
@@ -60,7 +63,10 @@ export type Database = {
         }
         Insert: {
           artist?: string | null
+          candidate?: Json | null
+          confidence?: string | null
           created_at?: string
+          heard?: string | null
           id?: string
           message?: string | null
           name?: string
@@ -70,7 +76,10 @@ export type Database = {
         }
         Update: {
           artist?: string | null
+          candidate?: Json | null
+          confidence?: string | null
           created_at?: string
+          heard?: string | null
           id?: string
           message?: string | null
           name?: string

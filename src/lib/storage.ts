@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
-import type { CrossfaderCurve, MorSyncRecord, SongRequest, StationSettings } from './types'
+import type { CrossfaderCurve, MorSyncRecord, RequestCandidate, SongRequest, StationSettings } from './types'
 
 // All station state lives in Lovable Cloud and is reached only from server routes
 // through the service-role client, so browsers can never read or write it directly.
@@ -274,8 +274,14 @@ export async function addRating(voterId: string) {
   return next
 }
 
-type RequestRow = { id: string; name: string; song_title: string; artist: string | null; message: string | null; note: string | null; created_at: string; status: string }
-const REQUEST_COLUMNS = 'id, name, song_title, artist, message, note, created_at, status'
+type RequestRow = { id: string; name: string; song_title: string; artist: string | null; message: string | null; note: string | null; heard: string | null; confidence: string | null; candidate: unknown; created_at: string; status: string }
+const REQUEST_COLUMNS = 'id, name, song_title, artist, message, note, heard, confidence, candidate, created_at, status'
+function toCandidate(value: unknown): RequestCandidate | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const item = value as Partial<RequestCandidate>
+  if (typeof item.youtubeId !== 'string' || typeof item.title !== 'string' || typeof item.url !== 'string') return undefined
+  return { youtubeId: item.youtubeId, title: item.title, url: item.url, channel: typeof item.channel === 'string' ? item.channel : undefined, duration: Number(item.duration) || 0, score: Number(item.score) || 0 }
+}
 function toSongRequest(row: RequestRow): SongRequest {
   return {
     id: row.id,
@@ -284,14 +290,17 @@ function toSongRequest(row: RequestRow): SongRequest {
     artist: row.artist || 'Unknown artist',
     message: row.message ?? undefined,
     note: row.note ?? undefined,
+    heard: row.heard ?? undefined,
+    confidence: (['high', 'medium', 'low'].includes(row.confidence ?? '') ? row.confidence : undefined) as SongRequest['confidence'],
+    candidate: toCandidate(row.candidate),
     requestedAt: new Date(row.created_at).getTime(),
-    status: (['pending', 'played', 'skipped'].includes(row.status) ? row.status : 'pending') as SongRequest['status'],
+    status: (['pending', 'review', 'played', 'skipped'].includes(row.status) ? row.status : 'pending') as SongRequest['status'],
   }
 }
 
 export async function getSongRequests() {
   const { data, error } = await supabaseAdmin.from('requests').select(REQUEST_COLUMNS)
-    .in('status', ['pending', 'skipped']).order('created_at', { ascending: false }).limit(200)
+    .in('status', ['pending', 'review', 'skipped']).order('created_at', { ascending: false }).limit(200)
   if (error) throw new Error(`Song requests read failed: ${error.message}`)
   return (data as RequestRow[]).map(toSongRequest)
 }
@@ -303,9 +312,16 @@ export async function getRecentSongRequests(limit = 60) {
   return (data as RequestRow[]).map(toSongRequest)
 }
 
-export async function addSongRequest(title: string, artist: string, name = 'Listener', message?: string) {
+export async function getSongRequest(id: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return null
+  const { data, error } = await supabaseAdmin.from('requests').select(REQUEST_COLUMNS).eq('id', id).maybeSingle()
+  if (error) throw new Error(`Song request read failed: ${error.message}`)
+  return data ? toSongRequest(data as RequestRow) : null
+}
+
+export async function addSongRequest(title: string, artist: string, name = 'Listener', message?: string, read: { heard?: string; confidence?: SongRequest['confidence'] } = {}) {
   const { data, error } = await supabaseAdmin.from('requests')
-    .insert({ name, song_title: title.slice(0, 200), artist: artist ? artist.slice(0, 120) : null, message: message?.slice(0, 2000) ?? null })
+    .insert({ name, song_title: title.slice(0, 200), artist: artist ? artist.slice(0, 120) : null, message: message?.slice(0, 2000) ?? null, heard: read.heard?.slice(0, 300) ?? null, confidence: read.confidence ?? null })
     .select(REQUEST_COLUMNS).single()
   if (error) throw new Error(`Song request save failed: ${error.message}`)
   return toSongRequest(data as RequestRow)
@@ -313,6 +329,22 @@ export async function addSongRequest(title: string, artist: string, name = 'List
 
 export async function setSongRequestNote(id: string, note: string | null) {
   await supabaseAdmin.from('requests').update({ note: note?.slice(0, 300) ?? null }).eq('id', id)
+}
+
+/** Park a request for admin confirmation with the song that was found. */
+export async function setSongRequestReview(id: string, candidate: RequestCandidate, note: string) {
+  const { error } = await supabaseAdmin.from('requests').update({ status: 'review', candidate: candidate as never, note: note.slice(0, 300) }).eq('id', id)
+  if (error) throw new Error(`Song request update failed: ${error.message}`)
+}
+
+/** Admin corrected the title/artist: search again as a sure request. */
+export async function correctSongRequest(id: string, title: string, artist: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return null
+  const { data, error } = await supabaseAdmin.from('requests')
+    .update({ song_title: title.slice(0, 200), artist: artist.slice(0, 120), status: 'pending', confidence: 'high', candidate: null, note: null })
+    .eq('id', id).select(REQUEST_COLUMNS).maybeSingle()
+  if (error) throw new Error(`Song request update failed: ${error.message}`)
+  return data ? toSongRequest(data as RequestRow) : null
 }
 
 export async function updateSongRequest(id: string, status: SongRequest['status']) {
